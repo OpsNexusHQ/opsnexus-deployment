@@ -23,6 +23,14 @@ on:
         required: false
         type: string
         default: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+      run_contract_assertions:
+        required: false
+        type: boolean
+        default: false
+      contract_profile:
+        required: false
+        type: string
+        default: contract-basic
 
 permissions:
   contents: read
@@ -303,6 +311,12 @@ jobs:
           done
           echo 'Backend restart readiness timed out' >&2
           exit 1
+      - name: Run CI-4 contract assertions
+        if: ${{ inputs.run_contract_assertions && inputs.contract_profile == 'contract-basic' }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          OPSNEXUS_CONTRACT_BASE_URL: http://127.0.0.1:8080
+        run: bash .github/scripts/ci-contract-basic.sh
       - name: Collect sanitized diagnostics
         if: ${{ failure() }}
         env:
