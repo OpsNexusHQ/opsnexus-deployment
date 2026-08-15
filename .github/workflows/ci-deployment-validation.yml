@@ -10,7 +10,7 @@ on:
       deployment_sha:
         required: false
         type: string
-        default: 262c78fa28d6a1ebc63363012802b348375712f4
+        default: 339a9dee79c9f6b9a783525db5c2e6d7d34811eb
       common_sha:
         required: false
         type: string
@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 env:
-  DEPLOYMENT_SHA: ${{ inputs.deployment_sha || '262c78fa28d6a1ebc63363012802b348375712f4' }}
+  DEPLOYMENT_SHA: ${{ inputs.deployment_sha || '339a9dee79c9f6b9a783525db5c2e6d7d34811eb' }}
   COMMON_SHA: ${{ inputs.common_sha || 'b571c0a7ae028906d08cf108e357350dda9384d7' }}
   BACKEND_SHA: ${{ inputs.backend_sha || '8b1e3340fee81f52a88bde293dd0a05fbc132668' }}
   DASHBOARD_SHA: ${{ inputs.dashboard_sha || 'fe5f4d309b09ed39fceac73ccdfbddfb1c562d97' }}

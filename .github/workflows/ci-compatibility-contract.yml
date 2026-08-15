@@ -6,7 +6,15 @@ on:
     paths:
       - .github/compatibility/contract-basic.json
       - .github/scripts/validate-contract-basic.sh
+      - .github/scripts/resolve_compatibility_set.py
+      - .github/workflows/ci-compatibility-contract.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      api_sha:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -17,16 +25,44 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check out deployment contract definition
+      - name: Check out deployment repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Check out authoritative API contract
+
+      - name: Check out base manifest from opsnexus-docs main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: main
+          path: ci-source/opsnexus-docs
+          persist-credentials: false
+
+      - name: Resolve compatibility set and API SHA
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          override_api_sha="${{ inputs.api_sha }}"
+          if [[ -n "$override_api_sha" ]]; then
+            echo "api_sha=$override_api_sha" >> "$GITHUB_OUTPUT"
+            echo "ci/compatibility-contract: using provided API SHA $override_api_sha"
+          else
+            pr_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+            python3 .github/scripts/resolve_compatibility_set.py \
+              --manifest ci-source/opsnexus-docs/engineering/releases/platform-compatibility.yaml \
+              --pr-repo opsnexus-deployment \
+              --pr-sha "$pr_sha" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out selected API contract revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-api
-          ref: 5c25b39547d30a57f07640a79115ca5f43b9544f
-          path: "$RUNNER_TEMP/opsnexus-api"
+          ref: ${{ steps.resolve.outputs.api_sha }}
+          path: ci-source/opsnexus-api
           persist-credentials: false
+
       - name: Validate contract-covered assertion specification
-        run: bash .github/scripts/validate-contract-basic.sh .github/compatibility/contract-basic.json "$RUNNER_TEMP/opsnexus-api/api/openapi.yaml"
+        run: bash .github/scripts/validate-contract-basic.sh .github/compatibility/contract-basic.json ci-source/opsnexus-api/api/openapi.yaml
