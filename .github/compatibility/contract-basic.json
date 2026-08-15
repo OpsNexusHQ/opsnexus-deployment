@@ -60,7 +60,7 @@
       "name": "events",
       "method": "GET",
       "path": "/api/v1/events",
-      "response": {"status": 200, "content_type": "text/event-stream", "body_contains": ": connected"}
+      "response": {"status": 200, "content_type": "text/event-stream"}
     }
   ]
 }

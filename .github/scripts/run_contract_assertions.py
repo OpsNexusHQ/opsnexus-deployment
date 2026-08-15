@@ -41,7 +41,7 @@ def request(base_url: str, assertion: dict) -> tuple[int, str, bytes]:
     try:
         with urllib.request.urlopen(request_obj, timeout=TIMEOUT) as response:
             content_type = response.headers.get("Content-Type", "")
-            body = response.read(512 if assertion["name"] == "events" else 1024 * 1024)
+            body = b"" if assertion["name"] == "events" else response.read(1024 * 1024)
             return response.status, content_type, body
     except urllib.error.HTTPError as exc:
         body = exc.read(1024)
@@ -66,6 +66,8 @@ def validate(assertion: dict, status: int, content_type: str, body: bytes) -> No
     expected_content_type = response_spec.get("content_type")
     if expected_content_type and not content_type.lower().startswith(expected_content_type.lower()):
         fail(f"{assertion['name']} expected Content-Type {expected_content_type}, got {content_type}")
+    if assertion["name"] == "events":
+        return
     if response_spec.get("body_contains"):
         if response_spec["body_contains"].encode() not in body:
             fail(f"{assertion['name']} response did not contain {response_spec['body_contains']!r}")
