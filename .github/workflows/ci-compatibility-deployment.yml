@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-docs
-          ref: ${{ inputs.base_manifest_sha || 'f692608bfe837f19625cc4f7208aee70c1fdfc43' }}
+          ref: ${{ inputs.base_manifest_sha || github.event.pull_request.base.sha || 'f692608bfe837f19625cc4f7208aee70c1fdfc43' }}
           path: ci-source/opsnexus-docs-base
           persist-credentials: false
 
