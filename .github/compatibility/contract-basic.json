@@ -2,12 +2,65 @@
   "profile": "contract-basic",
   "contract": "opsnexus-api/api/openapi.yaml",
   "assertions": [
-    {"name":"registration","method":"POST","path":"/api/v1/agents/register","status":201,"response_fields":["id"]},
-    {"name":"telemetry","method":"POST","path":"/api/v1/agents/{id}/telemetry","status":201,"response_fields":["status"]},
-    {"name":"health","method":"GET","path":"/api/v1/agents/{id}/health","status":200,"response_fields":["agent_id","status"]},
-    {"name":"metrics","method":"GET","path":"/api/v1/agents/{id}/metrics","status":200,"response_fields":["agent_id","timestamp","metrics"]},
-    {"name":"overview","method":"GET","path":"/api/v1/overview","status":200,"response_fields":["total","healthy","stale","offline"]},
-    {"name":"alerts","method":"GET","path":"/api/v1/alerts","status":200,"response_fields":["alerts"]},
-    {"name":"events","method":"GET","path":"/api/v1/events","status":200,"content_type":"text/event-stream","response_fields":[]}
+    {
+      "name": "registration",
+      "method": "POST",
+      "path": "/api/v1/agents/register",
+      "request": {
+        "content_type": "application/json",
+        "body": {"id": "__agent_id__", "name": "CI Compatibility Agent", "hostname": "ci", "os": "linux", "arch": "amd64", "version": "ci"},
+        "required_fields": ["id", "name", "hostname", "os", "arch", "version"]
+      },
+      "response": {
+        "status": 201,
+        "content_type": "application/json",
+        "fields": [{"path": "id", "type": "string", "equals": "__agent_id__"}]
+      }
+    },
+    {
+      "name": "telemetry",
+      "method": "POST",
+      "path": "/api/v1/agents/{id}/telemetry",
+      "request": {
+        "content_type": "application/json",
+        "body": {"agent_id": "__agent_id__", "timestamp": "2026-08-16T00:00:00Z", "metrics": {"system": {"timestamp": "2026-08-16T00:00:00Z"}}},
+        "required_fields": ["agent_id", "timestamp", "metrics"]
+      },
+      "response": {
+        "status": 201,
+        "content_type": "application/json",
+        "fields": [{"path": "status", "type": "string", "equals": "accepted"}]
+      }
+    },
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/api/v1/agents/{id}/health",
+      "response": {"status": 200, "content_type": "application/json", "fields": [{"path": "agent_id", "type": "string"}, {"path": "status", "type": "string"}]}
+    },
+    {
+      "name": "metrics",
+      "method": "GET",
+      "path": "/api/v1/agents/{id}/metrics",
+      "response": {"status": 200, "content_type": "application/json", "fields": [{"path": "agent_id", "type": "string"}, {"path": "timestamp", "type": "string"}, {"path": "metrics", "type": "object"}]}
+    },
+    {
+      "name": "overview",
+      "method": "GET",
+      "path": "/api/v1/overview",
+      "response": {"status": 200, "content_type": "application/json", "fields": [{"path": "total", "type": "number"}, {"path": "healthy", "type": "number"}, {"path": "stale", "type": "number"}, {"path": "offline", "type": "number"}]}
+    },
+    {
+      "name": "alerts",
+      "method": "GET",
+      "path": "/api/v1/alerts",
+      "response": {"status": 200, "content_type": "application/json", "fields": [{"path": "alerts", "type": "array"}]}
+    },
+    {
+      "name": "events",
+      "method": "GET",
+      "path": "/api/v1/events",
+      "response": {"status": 200, "content_type": "text/event-stream", "body_contains": ": connected"}
+    }
   ]
 }
