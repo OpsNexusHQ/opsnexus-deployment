@@ -319,7 +319,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-deployment
-          ref: d42f8584068852de70aebc4b33c1c29d575464b8
+          ref: d1bf3cf34358cc6f85420158afdd6ddde255d29b
           path: ci-source/opsnexus-ci
           persist-credentials: false
       - name: Run CI-4 contract assertions
