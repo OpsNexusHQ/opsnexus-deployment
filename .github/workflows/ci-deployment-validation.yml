@@ -1,0 +1,409 @@
+name: Deployment Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DEPLOYMENT_SHA: 262c78fa28d6a1ebc63363012802b348375712f4
+  COMMON_SHA: b571c0a7ae028906d08cf108e357350dda9384d7
+  BACKEND_SHA: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+  DASHBOARD_SHA: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+  CHECKOUT_SHA: 11bd71901bbe5b1630ceea73d27597364c9af683
+
+jobs:
+  deployment-config:
+    name: ci/deployment-config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out deployment baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          path: ci-source/opsnexus-deployment
+
+      - name: Check out common baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-common
+          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          path: ci-source/opsnexus-common
+
+      - name: Check out backend baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-backend
+          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          path: ci-source/opsnexus-backend
+
+      - name: Check out dashboard baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-dashboard
+          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          path: ci-source/opsnexus-dashboard
+
+      - name: Assemble workspace and controlled environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/OpsNexus"
+          rm -rf "$workspace"
+          mkdir -p "$workspace"
+          cp -a ci-source/opsnexus-deployment "$workspace/opsnexus-deployment"
+          cp -a ci-source/opsnexus-common "$workspace/opsnexus-common"
+          cp -a ci-source/opsnexus-backend "$workspace/opsnexus-backend"
+          cp -a ci-source/opsnexus-dashboard "$workspace/opsnexus-dashboard"
+          env_file="$RUNNER_TEMP/opsnexus-ci.env"
+          umask 077
+          {
+            printf '%s\n' 'POSTGRES_USER=opsnexus_ci'
+            printf '%s\n' 'POSTGRES_PASSWORD=opsnexus_ci_test_password'
+            printf '%s\n' 'POSTGRES_DB=opsnexus_ci'
+            printf '%s\n' 'OPSNEXUS_HOST=0.0.0.0'
+            printf '%s\n' 'OPSNEXUS_PORT=8080'
+            printf '%s\n' 'OPSNEXUS_DATABASE_URL=postgres://opsnexus_ci:opsnexus_ci_test_password@postgres:5432/opsnexus_ci?sslmode=disable'
+            printf '%s\n' 'OPSNEXUS_TELEMETRY_RETENTION=30'
+            printf '%s\n' 'OPSNEXUS_API_AUTH_ENABLED=false'
+            printf '%s\n' 'OPSNEXUS_CORS_ORIGINS=http://127.0.0.1:5173'
+            printf '%s\n' 'VITE_API_BASE_URL=http://127.0.0.1:8080'
+          } > "$env_file"
+          printf '%s\n' "$workspace/opsnexus-deployment" > "$RUNNER_TEMP/opsnexus-deployment-dir"
+          printf '%s\n' "$env_file" > "$RUNNER_TEMP/opsnexus-env-file"
+
+      - name: Print Docker tool versions
+        run: |
+          docker version
+          docker compose version
+
+      - name: Validate Compose configuration
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        run: docker compose --env-file "$RUNNER_TEMP/opsnexus-ci.env" config --quiet
+
+      - name: Clean temporary workspace
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/OpsNexus" "$RUNNER_TEMP/opsnexus-ci.env" "$RUNNER_TEMP/opsnexus-deployment-dir" "$RUNNER_TEMP/opsnexus-env-file"
+
+  deployment-build:
+    name: ci/deployment-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out deployment baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          path: ci-source/opsnexus-deployment
+      - name: Check out common baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-common
+          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          path: ci-source/opsnexus-common
+      - name: Check out backend baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-backend
+          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          path: ci-source/opsnexus-backend
+      - name: Check out dashboard baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-dashboard
+          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          path: ci-source/opsnexus-dashboard
+      - name: Assemble workspace and controlled environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/OpsNexus"
+          rm -rf "$workspace"
+          mkdir -p "$workspace"
+          cp -a ci-source/opsnexus-deployment "$workspace/opsnexus-deployment"
+          cp -a ci-source/opsnexus-common "$workspace/opsnexus-common"
+          cp -a ci-source/opsnexus-backend "$workspace/opsnexus-backend"
+          cp -a ci-source/opsnexus-dashboard "$workspace/opsnexus-dashboard"
+          umask 077
+          {
+            printf '%s\n' 'POSTGRES_USER=opsnexus_ci'
+            printf '%s\n' 'POSTGRES_PASSWORD=opsnexus_ci_test_password'
+            printf '%s\n' 'POSTGRES_DB=opsnexus_ci'
+            printf '%s\n' 'OPSNEXUS_HOST=0.0.0.0'
+            printf '%s\n' 'OPSNEXUS_PORT=8080'
+            printf '%s\n' 'OPSNEXUS_DATABASE_URL=postgres://opsnexus_ci:opsnexus_ci_test_password@postgres:5432/opsnexus_ci?sslmode=disable'
+            printf '%s\n' 'OPSNEXUS_TELEMETRY_RETENTION=30'
+            printf '%s\n' 'OPSNEXUS_API_AUTH_ENABLED=false'
+            printf '%s\n' 'OPSNEXUS_CORS_ORIGINS=http://127.0.0.1:5173'
+            printf '%s\n' 'VITE_API_BASE_URL=http://127.0.0.1:8080'
+          } > "$RUNNER_TEMP/opsnexus-ci.env"
+      - name: Print Docker tool versions
+        run: |
+          docker version
+          docker compose version
+      - name: Build Compose images
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        run: docker compose --env-file "$RUNNER_TEMP/opsnexus-ci.env" build postgres backend dashboard
+      - name: Clean temporary workspace
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/OpsNexus" "$RUNNER_TEMP/opsnexus-ci.env"
+
+  deployment-startup:
+    name: ci/deployment-startup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out deployment baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          path: ci-source/opsnexus-deployment
+      - name: Check out common baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-common
+          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          path: ci-source/opsnexus-common
+      - name: Check out backend baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-backend
+          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          path: ci-source/opsnexus-backend
+      - name: Check out dashboard baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-dashboard
+          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          path: ci-source/opsnexus-dashboard
+      - name: Assemble workspace and controlled environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/OpsNexus"
+          rm -rf "$workspace"
+          mkdir -p "$workspace"
+          cp -a ci-source/opsnexus-deployment "$workspace/opsnexus-deployment"
+          cp -a ci-source/opsnexus-common "$workspace/opsnexus-common"
+          cp -a ci-source/opsnexus-backend "$workspace/opsnexus-backend"
+          cp -a ci-source/opsnexus-dashboard "$workspace/opsnexus-dashboard"
+          umask 077
+          {
+            printf '%s\n' 'POSTGRES_USER=opsnexus_ci'
+            printf '%s\n' 'POSTGRES_PASSWORD=opsnexus_ci_test_password'
+            printf '%s\n' 'POSTGRES_DB=opsnexus_ci'
+            printf '%s\n' 'OPSNEXUS_HOST=0.0.0.0'
+            printf '%s\n' 'OPSNEXUS_PORT=8080'
+            printf '%s\n' 'OPSNEXUS_DATABASE_URL=postgres://opsnexus_ci:opsnexus_ci_test_password@postgres:5432/opsnexus_ci?sslmode=disable'
+            printf '%s\n' 'OPSNEXUS_TELEMETRY_RETENTION=30'
+            printf '%s\n' 'OPSNEXUS_API_AUTH_ENABLED=false'
+            printf '%s\n' 'OPSNEXUS_CORS_ORIGINS=http://127.0.0.1:5173'
+            printf '%s\n' 'VITE_API_BASE_URL=http://127.0.0.1:8080'
+          } > "$RUNNER_TEMP/opsnexus-ci.env"
+          export COMPOSE_PROJECT_NAME="opsnexus-ci-${GITHUB_RUN_ID}-${GITHUB_JOB}"
+          printf '%s\n' "$COMPOSE_PROJECT_NAME" > "$RUNNER_TEMP/opsnexus-project"
+      - name: Start deployment stack
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" up -d --build
+      - name: Wait for PostgreSQL readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 120))
+          while (( SECONDS < deadline )); do
+            state=missing
+            if state="$(docker inspect --format '{{.State.Health.Status}}' opsnexus-postgres 2>/dev/null)"; then :; fi
+            if [[ "$state" == healthy ]]; then exit 0; fi
+            sleep 5
+          done
+          echo 'PostgreSQL readiness timed out' >&2
+          exit 1
+      - name: Wait for backend readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 120))
+          while (( SECONDS < deadline )); do
+            response=
+            if response="$(curl --fail --silent --show-error http://127.0.0.1:8080/health 2>/dev/null)"; then :; fi
+            if grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"$response" && grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$response"; then exit 0; fi
+            sleep 5
+          done
+          echo 'Backend readiness timed out' >&2
+          exit 1
+      - name: Assert migration schema
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          set -euo pipefail
+          result="$(docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT to_regclass('\''public.telemetry_hourly'\'');"')"
+          test "$(printf '%s' "$result" | tr -d '[:space:]')" = telemetry_hourly
+      - name: Restart backend
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" restart backend
+      - name: Verify backend after restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 120))
+          while (( SECONDS < deadline )); do
+            response=
+            if response="$(curl --fail --silent --show-error http://127.0.0.1:8080/health 2>/dev/null)"; then :; fi
+            if grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"$response" && grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$response"; then exit 0; fi
+            sleep 5
+          done
+          echo 'Backend restart readiness timed out' >&2
+          exit 1
+      - name: Collect sanitized diagnostics
+        if: ${{ failure() }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" ps --all
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" images
+          if docker inspect opsnexus-postgres opsnexus-backend opsnexus-dashboard 2>/dev/null; then :; fi
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" logs --no-color postgres backend dashboard
+      - name: Clean deployment resources
+        if: ${{ always() }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" down --volumes --remove-orphans
+          rm -rf "$RUNNER_TEMP/OpsNexus" "$RUNNER_TEMP/opsnexus-ci.env" "$RUNNER_TEMP/opsnexus-project"
+
+  deployment-smoke:
+    name: ci/deployment-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out deployment baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          path: ci-source/opsnexus-deployment
+      - name: Check out common baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-common
+          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          path: ci-source/opsnexus-common
+      - name: Check out backend baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-backend
+          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          path: ci-source/opsnexus-backend
+      - name: Check out dashboard baseline
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-dashboard
+          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          path: ci-source/opsnexus-dashboard
+      - name: Assemble workspace and controlled environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/OpsNexus"
+          rm -rf "$workspace"
+          mkdir -p "$workspace"
+          cp -a ci-source/opsnexus-deployment "$workspace/opsnexus-deployment"
+          cp -a ci-source/opsnexus-common "$workspace/opsnexus-common"
+          cp -a ci-source/opsnexus-backend "$workspace/opsnexus-backend"
+          cp -a ci-source/opsnexus-dashboard "$workspace/opsnexus-dashboard"
+          umask 077
+          {
+            printf '%s\n' 'POSTGRES_USER=opsnexus_ci'
+            printf '%s\n' 'POSTGRES_PASSWORD=opsnexus_ci_test_password'
+            printf '%s\n' 'POSTGRES_DB=opsnexus_ci'
+            printf '%s\n' 'OPSNEXUS_HOST=0.0.0.0'
+            printf '%s\n' 'OPSNEXUS_PORT=8080'
+            printf '%s\n' 'OPSNEXUS_DATABASE_URL=postgres://opsnexus_ci:opsnexus_ci_test_password@postgres:5432/opsnexus_ci?sslmode=disable'
+            printf '%s\n' 'OPSNEXUS_TELEMETRY_RETENTION=30'
+            printf '%s\n' 'OPSNEXUS_API_AUTH_ENABLED=false'
+            printf '%s\n' 'OPSNEXUS_CORS_ORIGINS=http://127.0.0.1:5173'
+            printf '%s\n' 'VITE_API_BASE_URL=http://127.0.0.1:8080'
+          } > "$RUNNER_TEMP/opsnexus-ci.env"
+      - name: Print Docker tool versions
+        run: |
+          docker version
+          docker compose version
+      - name: Start smoke stack
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" build postgres backend dashboard
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" up -d
+      - name: Wait for PostgreSQL and backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          postgres_deadline=$((SECONDS + 120))
+          while (( SECONDS < postgres_deadline )); do
+            state=missing
+            if state="$(docker inspect --format '{{.State.Health.Status}}' opsnexus-postgres 2>/dev/null)"; then :; fi
+            if [[ "$state" == healthy ]]; then break; fi
+            sleep 5
+          done
+          [[ "$state" == healthy ]]
+          backend_deadline=$((SECONDS + 120))
+          while (( SECONDS < backend_deadline )); do
+            response=
+            if response="$(curl --fail --silent --show-error http://127.0.0.1:8080/health 2>/dev/null)"; then :; fi
+            if grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"$response" && grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$response"; then exit 0; fi
+            sleep 5
+          done
+          echo 'Backend readiness timed out' >&2
+          exit 1
+      - name: Assert migration and backend health
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          set -euo pipefail
+          result="$(docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT to_regclass('\''public.telemetry_hourly'\'');"')"
+          test "$(printf '%s' "$result" | tr -d '[:space:]')" = telemetry_hourly
+          response="$(curl --fail --silent --show-error http://127.0.0.1:8080/health)"
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"$response"
+          grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$response"
+      - name: Smoke test dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error http://127.0.0.1:5173/)"
+          test -n "$response"
+          grep -Fq '<title>opsnexus-dashboard</title>' <<<"$response"
+          grep -Fq '<div id="root"></div>' <<<"$response"
+      - name: Collect sanitized diagnostics
+        if: ${{ failure() }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" ps --all
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" images
+          if docker inspect opsnexus-postgres opsnexus-backend opsnexus-dashboard 2>/dev/null; then :; fi
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" logs --no-color postgres backend dashboard
+      - name: Clean deployment resources
+        if: ${{ always() }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          PROJECT: opsnexus-ci-${{ github.run_id }}-${{ github.job }}
+        run: |
+          docker compose --project-name "$PROJECT" --env-file "$RUNNER_TEMP/opsnexus-ci.env" down --volumes --remove-orphans
+          rm -rf "$RUNNER_TEMP/OpsNexus" "$RUNNER_TEMP/opsnexus-ci.env"
