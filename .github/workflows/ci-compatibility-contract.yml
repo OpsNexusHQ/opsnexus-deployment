@@ -43,6 +43,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-deployment
+          ref: 7d1b2a880de68e9dcdfa2348e71779d6efa56045
           path: ci-source/opsnexus-deployment
           persist-credentials: false
 
