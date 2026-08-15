@@ -319,7 +319,7 @@ jobs:
         working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
         env:
           OPSNEXUS_CONTRACT_BASE_URL: http://127.0.0.1:8080
-        run: bash .github/scripts/ci-contract-basic.sh
+        run: bash "$RUNNER_TEMP/OpsNexus/opsnexus-deployment/.github/scripts/ci-contract-basic.sh"
       - name: Collect sanitized diagnostics
         if: ${{ failure() }}
         env:
