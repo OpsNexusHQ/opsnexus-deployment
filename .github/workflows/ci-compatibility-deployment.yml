@@ -1,0 +1,21 @@
+name: Compatibility Deployment
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility-deployment:
+    name: ci/compatibility-deployment
+    uses: ./.github/workflows/ci-deployment-validation.yml
+    with:
+      deployment_sha: 339a9dee79c9f6b9a783525db5c2e6d7d34811eb
+      common_sha: b571c0a7ae028906d08cf108e357350dda9384d7
+      backend_sha: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+      dashboard_sha: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+      run_contract_assertions: true
+      contract_profile: contract-basic

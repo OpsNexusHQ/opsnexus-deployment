@@ -1,0 +1,13 @@
+{
+  "profile": "contract-basic",
+  "contract": "opsnexus-api/api/openapi.yaml",
+  "assertions": [
+    {"name":"registration","method":"POST","path":"/api/v1/agents/register","status":201,"response_fields":["id"]},
+    {"name":"telemetry","method":"POST","path":"/api/v1/agents/{id}/telemetry","status":201,"response_fields":["status"]},
+    {"name":"health","method":"GET","path":"/api/v1/agents/{id}/health","status":200,"response_fields":["agent_id","status"]},
+    {"name":"metrics","method":"GET","path":"/api/v1/agents/{id}/metrics","status":200,"response_fields":["agent_id","timestamp","metrics"]},
+    {"name":"overview","method":"GET","path":"/api/v1/overview","status":200,"response_fields":["total","healthy","stale","offline"]},
+    {"name":"alerts","method":"GET","path":"/api/v1/alerts","status":200,"response_fields":["alerts"]},
+    {"name":"events","method":"GET","path":"/api/v1/events","status":200,"content_type":"text/event-stream","response_fields":[]}
+  ]
+}
