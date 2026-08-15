@@ -22,7 +22,7 @@ on:
       base_manifest_sha:
         required: false
         type: string
-        default: f692608bfe837f19625cc4f7208aee70c1fdfc43
+        default: b54bde59f0e4c581e1362c520882730040e90b1d
       manifest_sha:
         required: false
         type: string
@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-docs
-          ref: ${{ inputs.base_manifest_sha || github.event.pull_request.base.sha || 'f692608bfe837f19625cc4f7208aee70c1fdfc43' }}
+          ref: ${{ inputs.base_manifest_sha || 'b54bde59f0e4c581e1362c520882730040e90b1d' }}
           path: ci-source/opsnexus-docs-base
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-docs
-          ref: faf783529ea6f45a4d156e7b98309eb1bd506e49
+          ref: b54bde59f0e4c581e1362c520882730040e90b1d # immutable opsnexus-docs compatibility tooling
           path: ci-source/opsnexus-docs-tools
           persist-credentials: false
 
