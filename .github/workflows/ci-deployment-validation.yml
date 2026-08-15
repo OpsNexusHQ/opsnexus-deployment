@@ -5,15 +5,41 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      deployment_sha:
+        required: false
+        type: string
+        default: 339a9dee79c9f6b9a783525db5c2e6d7d34811eb
+      common_sha:
+        required: false
+        type: string
+        default: b571c0a7ae028906d08cf108e357350dda9384d7
+      backend_sha:
+        required: false
+        type: string
+        default: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+      dashboard_sha:
+        required: false
+        type: string
+        default: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+      run_contract_assertions:
+        required: false
+        type: boolean
+        default: false
+      contract_profile:
+        required: false
+        type: string
+        default: contract-basic
 
 permissions:
   contents: read
 
 env:
-  DEPLOYMENT_SHA: 262c78fa28d6a1ebc63363012802b348375712f4
-  COMMON_SHA: b571c0a7ae028906d08cf108e357350dda9384d7
-  BACKEND_SHA: 8b1e3340fee81f52a88bde293dd0a05fbc132668
-  DASHBOARD_SHA: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+  DEPLOYMENT_SHA: ${{ inputs.deployment_sha || '339a9dee79c9f6b9a783525db5c2e6d7d34811eb' }}
+  COMMON_SHA: ${{ inputs.common_sha || 'b571c0a7ae028906d08cf108e357350dda9384d7' }}
+  BACKEND_SHA: ${{ inputs.backend_sha || '8b1e3340fee81f52a88bde293dd0a05fbc132668' }}
+  DASHBOARD_SHA: ${{ inputs.dashboard_sha || 'fe5f4d309b09ed39fceac73ccdfbddfb1c562d97' }}
   CHECKOUT_SHA: 11bd71901bbe5b1630ceea73d27597364c9af683
 
 jobs:
@@ -25,7 +51,8 @@ jobs:
       - name: Check out deployment baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: ${{ env.DEPLOYMENT_SHA }}
           path: ci-source/opsnexus-deployment
           persist-credentials: false
 
@@ -33,7 +60,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-common
-          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          ref: ${{ env.COMMON_SHA }}
           path: ci-source/opsnexus-common
           persist-credentials: false
 
@@ -41,7 +68,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-backend
-          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          ref: ${{ env.BACKEND_SHA }}
           path: ci-source/opsnexus-backend
           persist-credentials: false
 
@@ -49,7 +76,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-dashboard
-          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          ref: ${{ env.DASHBOARD_SHA }}
           path: ci-source/opsnexus-dashboard
           persist-credentials: false
 
@@ -104,28 +131,29 @@ jobs:
       - name: Check out deployment baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: ${{ env.DEPLOYMENT_SHA }}
           path: ci-source/opsnexus-deployment
           persist-credentials: false
       - name: Check out common baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-common
-          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          ref: ${{ env.COMMON_SHA }}
           path: ci-source/opsnexus-common
           persist-credentials: false
       - name: Check out backend baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-backend
-          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          ref: ${{ env.BACKEND_SHA }}
           path: ci-source/opsnexus-backend
           persist-credentials: false
       - name: Check out dashboard baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-dashboard
-          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          ref: ${{ env.DASHBOARD_SHA }}
           path: ci-source/opsnexus-dashboard
           persist-credentials: false
       - name: Assemble workspace and controlled environment
@@ -175,28 +203,29 @@ jobs:
       - name: Check out deployment baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: ${{ env.DEPLOYMENT_SHA }}
           path: ci-source/opsnexus-deployment
           persist-credentials: false
       - name: Check out common baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-common
-          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          ref: ${{ env.COMMON_SHA }}
           path: ci-source/opsnexus-common
           persist-credentials: false
       - name: Check out backend baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-backend
-          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          ref: ${{ env.BACKEND_SHA }}
           path: ci-source/opsnexus-backend
           persist-credentials: false
       - name: Check out dashboard baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-dashboard
-          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          ref: ${{ env.DASHBOARD_SHA }}
           path: ci-source/opsnexus-dashboard
           persist-credentials: false
       - name: Assemble workspace and controlled environment
@@ -285,6 +314,20 @@ jobs:
           done
           echo 'Backend restart readiness timed out' >&2
           exit 1
+      - name: Check out CI-4 assertion helpers
+        if: ${{ inputs.run_contract_assertions && inputs.contract_profile == 'contract-basic' }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: d1bf3cf34358cc6f85420158afdd6ddde255d29b
+          path: ci-source/opsnexus-ci
+          persist-credentials: false
+      - name: Run CI-4 contract assertions
+        if: ${{ inputs.run_contract_assertions && inputs.contract_profile == 'contract-basic' }}
+        working-directory: ${{ runner.temp }}/OpsNexus/opsnexus-deployment
+        env:
+          OPSNEXUS_CONTRACT_BASE_URL: http://127.0.0.1:8080
+        run: bash "$GITHUB_WORKSPACE/ci-source/opsnexus-ci/.github/scripts/ci-contract-basic.sh" "$GITHUB_WORKSPACE/ci-source/opsnexus-ci/.github/compatibility/contract-basic.json"
       - name: Collect sanitized diagnostics
         if: ${{ failure() }}
         env:
@@ -318,28 +361,29 @@ jobs:
       - name: Check out deployment baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: 262c78fa28d6a1ebc63363012802b348375712f4
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: ${{ env.DEPLOYMENT_SHA }}
           path: ci-source/opsnexus-deployment
           persist-credentials: false
       - name: Check out common baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-common
-          ref: b571c0a7ae028906d08cf108e357350dda9384d7
+          ref: ${{ env.COMMON_SHA }}
           path: ci-source/opsnexus-common
           persist-credentials: false
       - name: Check out backend baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-backend
-          ref: 8b1e3340fee81f52a88bde293dd0a05fbc132668
+          ref: ${{ env.BACKEND_SHA }}
           path: ci-source/opsnexus-backend
           persist-credentials: false
       - name: Check out dashboard baseline
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: OpsNexusHQ/opsnexus-dashboard
-          ref: fe5f4d309b09ed39fceac73ccdfbddfb1c562d97
+          ref: ${{ env.DASHBOARD_SHA }}
           path: ci-source/opsnexus-dashboard
           persist-credentials: false
       - name: Assemble workspace and controlled environment

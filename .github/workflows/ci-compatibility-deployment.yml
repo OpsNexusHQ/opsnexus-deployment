@@ -1,0 +1,107 @@
+name: Compatibility Deployment
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_manifest_sha:
+        description: Immutable opsnexus-docs commit containing the baseline manifest
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      pr_repo:
+        required: false
+        type: string
+        default: 'deployment'
+      pr_sha:
+        required: false
+        type: string
+        default: ''
+      base_manifest_sha:
+        required: false
+        type: string
+        default: b54bde59f0e4c581e1362c520882730040e90b1d
+      manifest_sha:
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-compatibility:
+    name: resolve-compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      deployment_sha: ${{ steps.resolver.outputs.deployment_sha }}
+      common_sha: ${{ steps.resolver.outputs.common_sha }}
+      backend_sha: ${{ steps.resolver.outputs.backend_sha }}
+      dashboard_sha: ${{ steps.resolver.outputs.dashboard_sha }}
+    steps:
+      - name: Check out deployment repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Check out immutable base manifest
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: ${{ inputs.base_manifest_sha || 'b54bde59f0e4c581e1362c520882730040e90b1d' }}
+          path: ci-source/opsnexus-docs-base
+          persist-credentials: false
+
+      - name: Check out immutable compatibility resolver
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: b54bde59f0e4c581e1362c520882730040e90b1d # immutable opsnexus-docs compatibility tooling
+          path: ci-source/opsnexus-docs-tools
+          persist-credentials: false
+
+      - name: Check out candidate manifest
+        if: ${{ inputs.manifest_sha != '' }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: ${{ inputs.manifest_sha }}
+          path: ci-source/opsnexus-docs-candidate
+          persist-credentials: false
+
+      - name: Resolve compatibility set
+        id: resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo_arg="${{ inputs.pr_repo || 'deployment' }}"
+          sha_arg="${{ inputs.pr_sha || github.event.pull_request.head.sha || github.sha }}"
+          manifest_path="ci-source/opsnexus-docs-base/engineering/releases/platform-compatibility.yaml"
+          candidate_path="ci-source/opsnexus-docs-candidate/engineering/releases/platform-compatibility.yaml"
+          if [[ ! -f "$manifest_path" ]]; then
+            [[ -f "$candidate_path" ]] || { echo "ci/compatibility-deployment: no base or candidate manifest exists" >&2; exit 1; }
+            echo "ci/compatibility-deployment: bootstrapping the first manifest" >&2
+            manifest_path="$candidate_path"
+          fi
+          args=(--manifest "$manifest_path" --pr-repo "$repo_arg" --pr-sha "$sha_arg")
+          if [[ -f "$candidate_path" && "$manifest_path" != "$candidate_path" ]]; then
+            args+=(--pr-manifest "$candidate_path")
+          fi
+          python3 ci-source/opsnexus-docs-tools/scripts/resolve_compatibility_set.py \
+            "${args[@]}" \
+            --github-output "$GITHUB_OUTPUT"
+
+  compatibility-deployment:
+    name: ci/compatibility-deployment
+    needs: resolve-compatibility
+    uses: ./.github/workflows/ci-deployment-validation.yml
+    with:
+      deployment_sha: ${{ needs.resolve-compatibility.outputs.deployment_sha }}
+      common_sha: ${{ needs.resolve-compatibility.outputs.common_sha }}
+      backend_sha: ${{ needs.resolve-compatibility.outputs.backend_sha }}
+      dashboard_sha: ${{ needs.resolve-compatibility.outputs.dashboard_sha }}
+      run_contract_assertions: true
+      contract_profile: contract-basic

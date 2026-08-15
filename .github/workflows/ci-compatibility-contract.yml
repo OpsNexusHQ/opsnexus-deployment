@@ -1,0 +1,110 @@
+name: Compatibility Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/compatibility/contract-basic.json
+      - .github/scripts/validate-contract-basic.sh
+      - .github/scripts/validate_contract_basic.py
+      - .github/scripts/run_contract_assertions.py
+      - .github/workflows/ci-compatibility-contract.yml
+  workflow_dispatch:
+    inputs:
+      base_manifest_sha:
+        description: Immutable opsnexus-docs commit containing the baseline manifest
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      api_sha:
+        required: false
+        type: string
+        default: ''
+      base_manifest_sha:
+        required: false
+        type: string
+        default: b54bde59f0e4c581e1362c520882730040e90b1d
+      manifest_sha:
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility-contract:
+    name: ci/compatibility-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out deployment repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-deployment
+          ref: 7d1b2a880de68e9dcdfa2348e71779d6efa56045
+          path: ci-source/opsnexus-deployment
+          persist-credentials: false
+
+      - name: Check out immutable base manifest
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: ${{ inputs.base_manifest_sha || 'b54bde59f0e4c581e1362c520882730040e90b1d' }}
+          path: ci-source/opsnexus-docs-base
+          persist-credentials: false
+
+      - name: Check out immutable compatibility resolver
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: b54bde59f0e4c581e1362c520882730040e90b1d # immutable opsnexus-docs compatibility tooling
+          path: ci-source/opsnexus-docs-tools
+          persist-credentials: false
+
+      - name: Check out candidate manifest
+        if: ${{ inputs.manifest_sha != '' }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-docs
+          ref: ${{ inputs.manifest_sha }}
+          path: ci-source/opsnexus-docs-candidate
+          persist-credentials: false
+
+      - name: Resolve compatibility set and API SHA
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          override_api_sha="${{ inputs.api_sha }}"
+          if [[ -n "$override_api_sha" ]]; then
+            echo "api_sha=$override_api_sha" >> "$GITHUB_OUTPUT"
+            echo "ci/compatibility-contract: using provided API SHA $override_api_sha"
+          else
+            pr_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+            manifest_path="ci-source/opsnexus-docs-base/engineering/releases/platform-compatibility.yaml"
+            candidate_path="ci-source/opsnexus-docs-candidate/engineering/releases/platform-compatibility.yaml"
+            if [[ ! -f "$manifest_path" ]]; then
+              [[ -f "$candidate_path" ]] || { echo "ci/compatibility-contract: no base or candidate manifest exists" >&2; exit 1; }
+              manifest_path="$candidate_path"
+            fi
+            args=(--manifest "$manifest_path" --pr-repo opsnexus-deployment --pr-sha "$pr_sha")
+            if [[ -f "$candidate_path" && "$manifest_path" != "$candidate_path" ]]; then
+              args+=(--pr-manifest "$candidate_path")
+            fi
+            python3 ci-source/opsnexus-docs-tools/scripts/resolve_compatibility_set.py \
+              "${args[@]}" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out selected API contract revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: OpsNexusHQ/opsnexus-api
+          ref: ${{ steps.resolve.outputs.api_sha }}
+          path: ci-source/opsnexus-api
+          persist-credentials: false
+
+      - name: Validate contract-covered assertion specification
+        run: bash ci-source/opsnexus-deployment/.github/scripts/validate-contract-basic.sh ci-source/opsnexus-deployment/.github/compatibility/contract-basic.json ci-source/opsnexus-api/api/openapi.yaml
