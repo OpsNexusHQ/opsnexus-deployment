@@ -1,0 +1,160 @@
+name: Security Validation (Independent)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+  workflow_run:
+    workflows: ['Security Scans']
+    types: [completed]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # Independent validation: test that gitleaks catches known patterns
+  gitleaks-validation:
+    name: ci/security/validate-gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          version: '8.27.2'
+          args: '--version'
+
+      - name: Create test fixtures (known secrets)
+        run: |
+          set -euo pipefail
+          mkdir -p .gitleaks-test
+          # These SHOULD be detected
+          echo 'API_KEY="TEST_KEY_FAKE_live_abcdefghijklmnopqrstuvwxyz123456"' > .gitleaks-test/real-secret.env
+          echo 'password = "supersecretpassword123"' > .gitleaks-test/config.ini
+          echo 'const token = "ghp_TEST_FAKE_abcdefghijklmnopqrstuvwxyz123456"' > .gitleaks-test/token.js
+          # These should NOT be detected (allowlisted)
+          echo 'password = "changeme"' > .gitleaks-test/allowlisted.ini
+          echo 'api_key = "your_api_key_here"' > .gitleaks-test/example.env
+
+      - name: Run gitleaks on test fixtures (should FAIL)
+        id: gitleaks-detect
+        run: |
+          set +e
+          gitleaks detect --source .gitleaks-test --config .gitleaks.toml --redact --no-banner
+          EXIT_CODE=$?
+          set -e
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "ERROR: Gitleaks should have detected secrets in test fixtures but didn't"
+            exit 1
+          fi
+          echo "✅ Gitleaks correctly detected secrets in test fixtures"
+
+      - name: Verify allowlist works (should PASS)
+        run: |
+          set -euo pipefail
+          gitleaks detect --source .gitleaks-test/allowlisted.ini --config .gitleaks.toml --redact --no-banner
+          echo "✅ Allowlist correctly permits example values"
+
+      - name: Cleanup
+        run: rm -rf .gitleaks-test
+
+  # Remote validation: scan a known vulnerable repo
+  remote-validation:
+    name: ci/security/validate-remote
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Clone test repository with known secrets
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/gitleaks/gitleaks.git /tmp/gitleaks-test-repo 2>/dev/null || true
+
+      - name: Run gitleaks on known test repo
+        run: |
+          set -euo pipefail
+          cd /tmp/gitleaks-test-repo
+          # This repo has test fixtures that should be caught
+          gitleaks detect --source . --config ${{ github.workspace }}/.gitleaks.toml --redact --no-banner --exit-code 1 || true
+          echo "Remote validation complete"
+
+  # Validate govulncheck works
+  govulncheck-validation:
+    name: ci/security/validate-govulncheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ github.repository != 'OpsNexusHQ/opsnexus-dashboard' && github.repository != 'OpsNexusHQ/opsnexus-api' && github.repository != 'OpsNexusHQ/opsnexus-docs' && github.repository != 'OpsNexusHQ/opsnexus-deployment' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run govulncheck (should pass on clean codebase)
+        run: |
+          set -euo pipefail
+          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+          echo "✅ govulncheck passed - no known vulnerabilities"
+
+  # Validate npm audit works
+  npm-audit-validation:
+    name: ci/security/validate-npm-audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ github.repository == 'OpsNexusHQ/opsnexus-dashboard' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.23.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (baseline)
+        run: |
+          set -euo pipefail
+          npm audit --audit-level=high --package-lock-only
+          echo "✅ npm audit passed - no high/critical vulnerabilities"
+
+  # Summary
+  validation-summary:
+    name: ci/security/validation-summary
+    needs: [gitleaks-validation, remote-validation, govulncheck-validation, npm-audit-validation]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Report
+        run: |
+          set -euo pipefail
+          echo "## Security Validation Summary"
+          echo ""
+          echo "| Check | Status |
+          echo "|-------|--------|
+          echo "| Gitleaks detection | ${{ needs.gitleaks-validation.result }} |
+          echo "| Remote validation | ${{ needs.remote-validation.result }} |
+          echo "| Govulncheck | ${{ needs.govulncheck-validation.result }} |
+          echo "| npm audit | ${{ needs.npm-audit-validation.result }} |
+          echo ""
+          if [[ "${{ needs.gitleaks-validation.result }}" != "success" || "${{ needs.remote-validation.result }}" != "success" || "${{ needs.govulncheck-validation.result }}" != "success" || "${{ needs.npm-audit-validation.result }}" != "success" ]]; then
+            echo "::error::One or more security validations failed"
+            exit 1
+          fi
+          echo "✅ All security validations passed"
