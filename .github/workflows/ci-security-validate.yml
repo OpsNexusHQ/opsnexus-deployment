@@ -1,4 +1,5 @@
 name: Security Validation (Independent)
+# Registration marker: keep this workflow discoverable after CI-5 rollout.
 
 on:
   workflow_dispatch:
@@ -146,12 +147,12 @@ jobs:
           set -euo pipefail
           echo "## Security Validation Summary"
           echo ""
-          echo "| Check | Status |
-          echo "|-------|--------|
-          echo "| Gitleaks detection | ${{ needs.gitleaks-validation.result }} |
-          echo "| Remote validation | ${{ needs.remote-validation.result }} |
-          echo "| Govulncheck | ${{ needs.govulncheck-validation.result }} |
-          echo "| npm audit | ${{ needs.npm-audit-validation.result }} |
+          echo "| Check | Status |"
+          echo "|-------|--------|"
+          echo "| Gitleaks detection | ${{ needs.gitleaks-validation.result }} |"
+          echo "| Remote validation | ${{ needs.remote-validation.result }} |"
+          echo "| Govulncheck | ${{ needs.govulncheck-validation.result }} |"
+          echo "| npm audit | ${{ needs.npm-audit-validation.result }} |"
           echo ""
           if [[ "${{ needs.gitleaks-validation.result }}" != "success" || "${{ needs.remote-validation.result }}" != "success" || "${{ needs.govulncheck-validation.result }}" != "success" || "${{ needs.npm-audit-validation.result }}" != "success" ]]; then
             echo "::error::One or more security validations failed"
